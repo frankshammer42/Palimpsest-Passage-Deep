@@ -13,8 +13,10 @@ import sys
 import datetime
 import cv2
 import time
-
+import serial 
 cap = cv2.VideoCapture(0) 
+faceCascade = cv2.CascadeClassifier("./haarcascade_frontalface_default.xml")
+ser = serial.Serial('/dev/cu.usbmodem14201', 9600)
 
 class DeepLabModel(object):
     """Class to load deeplab model and run inference."""
@@ -101,15 +103,36 @@ def run_visualization(filepath, MODEL, outputFilePath):
     drawSegment(resized_im, seg_map, outputFilePath)
 
 
+#TODO: Change the parameter that is suited for the lighting enviroment 
 def extract_foreground(result_file_name, MODEL, progress):
     print("Start Taking Photo")
     time.sleep(1)
     ret, frame = cap.read()
+    # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # faces = faceCascade.detectMultiScale(
+        # gray,
+        # scaleFactor=1.1,
+        # minNeighbors=5,
+        # minSize=(30, 30),
+        # flags=cv2.CASCADE_SCALE_IMAGE
+    # )
+    # if (len(faces) != 1):
+        # print(len(faces))
+        # print("No Faces Detected Pass")
+    # else:
+        # print("Face Detected, started to extract background")
     cv2.imwrite(result_file_name, frame)
     print("Finish Writing Image " + result_file_name)
     extract_input_path = result_file_name
     result_name = "./extracted_images/" + str(progress) + ".png" 
     run_visualization(extract_input_path, MODEL, result_name)
+
+
+def take_pic(MODEL, progress):
+    print("In range, start taking pic")
+    path = "./raw_images/"
+    file_name = path + str(progress) + ".jpg"
+    extract_foreground(file_name, MODEL, progress)
 
 
 def take_picture_every(seconds, number_of_images, MODEL):
@@ -147,12 +170,27 @@ def main():
       # print("Bad parameters. Please specify input file path and output file path")
       # exit()
 
+    progress = 0
     modelType = "mobile_net_model"
     MODEL = DeepLabModel(modelType)
     print('model loaded successfully : ' + modelType)
-    take_picture_every(2, 10, MODEL)
-    additive_blending(10)
-    # run_visualization(inputFilePath, MODEL, outputFilePath)
+    # take_picture_every(2, 10, MODEL)
+    # additive_blending(10)
+    while True: 
+        result = ser.readline()
+        result = result.strip()
+        result = result.decode("utf-8")
+        if (result == "met"):
+            take_pic(MODEL, progress)
+            progress += 1
+        print(result)
+        if(progress == 10):
+            print("start blending")
+            additive_blending(9)
+            return
+
+        
+        time.sleep(0.01)
 
 
 if __name__=="__main__":
